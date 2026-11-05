@@ -22,7 +22,7 @@ uvicorn backend.api:app --reload --port 8000
 cd frontend && npm install && npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
+Open **https://aml-six.vercel.app/** in your browser.
 
 ---
 

@@ -3,7 +3,7 @@ Root ASGI entrypoint wrapper.
 Allows deployment platforms (Render, Railway, Heroku, etc.) to load the app using either:
   uvicorn api:app --host 0.0.0.0 --port $PORT
 or
-  uvicorn backend.api:app --host 0.0.0.0 --port $PORT
+  uvicorn backend.api:app --host 8000 --port $PORT
 """
 from backend.api import app
 

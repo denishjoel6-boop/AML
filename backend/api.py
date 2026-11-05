@@ -208,3 +208,126 @@ async def get_graph(account_id: str = Query(...), hops: int = Query(2, ge=1, le=
 async def health():
     return {"status": "ok", "scored_count": len(SCORED_TRANSACTIONS),
             "open_cases": sum(1 for c in CASES.values() if c["status"] == "open")}
+
+# ---------------------------------------------------------------------------
+# RippleEffect: Simulation endpoints (read-only, no side effects)
+# ---------------------------------------------------------------------------
+
+class SimulateRequest(BaseModel):
+    """
+    Hypothetical transaction payload for the RippleEffect simulator.
+    This NEVER creates a real transaction, modifies SCORED_TRANSACTIONS,
+    or creates Cases. It is a pure, in-memory scoring call.
+    """
+    sender_id: str
+    receiver_id: str
+    amount: float
+    device_id: str = ""
+    city: str = ""
+    timestamp: str = ""
+
+@app.post("/simulate")
+async def simulate(req: SimulateRequest):
+    """
+    Score a hypothetical transaction without persisting anything.
+    Returns the scoring result plus the computed historical features so the
+    UI can explain exactly which signals drove the score.
+    No transaction is stored. No case is created.
+    """
+    if req.amount <= 0:
+        raise HTTPException(status_code=422, detail="amount must be > 0")
+    if not req.sender_id.strip():
+        raise HTTPException(status_code=422, detail="sender_id must be non-empty")
+    if not req.receiver_id.strip():
+        raise HTTPException(status_code=422, detail="receiver_id must be non-empty")
+    if req.sender_id.strip() == req.receiver_id.strip():
+        raise HTTPException(status_code=422, detail="sender_id and receiver_id must be different")
+
+    try:
+        ts_dt = pd.to_datetime(req.timestamp)
+        ts_epoch = int(ts_dt.timestamp())
+    except Exception:
+        ts_dt = datetime.now(timezone.utc)
+        ts_epoch = int(ts_dt.timestamp())
+
+    tx = {
+        "transaction_id": "SIM_RIPPLE",
+        "sender_id":  req.sender_id,
+        "receiver_id": req.receiver_id,
+        "amount":     req.amount,
+        "device_id":  req.device_id,
+        "city":       req.city,
+        "timestamp":  req.timestamp or ts_dt.isoformat(),
+    }
+
+    historical_features = _compute_inline_features(
+        req.sender_id, req.receiver_id, req.amount,
+        req.device_id, req.city, ts_epoch
+    )
+
+    result = score_transaction(tx, historical_features)
+
+    # Also score sender with their own historical profile to get a baseline
+    # Use the same account scoring as a "before" score
+    baseline_features = _compute_inline_features(
+        req.sender_id, req.sender_id,   # dummy self-send to capture sender state
+        req.amount, req.device_id, req.city, ts_epoch
+    )
+    # Reuse sender's most-recent scored transaction as baseline if available
+    sender_prior = [t for t in SCORED_TRANSACTIONS if t.get("sender_id") == req.sender_id]
+    if sender_prior:
+        baseline_score = float(sender_prior[0].get("risk_score", 0.0))
+        baseline_action = sender_prior[0].get("action", "ALLOW")
+        baseline_reasons = sender_prior[0].get("reasons", [])
+    else:
+        baseline_score = None
+        baseline_action = None
+        baseline_reasons = []
+
+    # Attach extra context to the simulation result
+    result["simulation"] = True
+    result["sender_id"] = req.sender_id
+    result["receiver_id"] = req.receiver_id
+    result["amount"] = req.amount
+    result["device_id"] = req.device_id
+    result["city"] = req.city
+    result["timestamp"] = req.timestamp or ts_dt.isoformat()
+    result["historical_features"] = historical_features
+    result["baseline"] = {
+        "score": baseline_score,
+        "action": baseline_action,
+        "reasons": baseline_reasons,
+        "note": "Most recent live transaction by this sender" if sender_prior else "No prior transactions by this sender in the live feed",
+    }
+    return result
+
+
+@app.get("/accounts/sample")
+async def accounts_sample(limit: int = Query(50, ge=5, le=200)):
+    """
+    Return a sample of account IDs from the graph for use in the
+    RippleEffect sender/receiver dropdowns.
+    Prioritises accounts with high graph_risk so the simulator is interesting.
+    """
+    if not GRAPH_RISKS:
+        raise HTTPException(status_code=503, detail="Graph risks not loaded yet")
+
+    # Sort by graph_risk descending, take top `limit`
+    sorted_accounts = sorted(
+        GRAPH_RISKS.items(),
+        key=lambda kv: float(kv[1].get("graph_risk", 0.0)),
+        reverse=True,
+    )[:limit]
+
+    return {
+        "accounts": [
+            {
+                "account_id": acc_id,
+                "graph_risk": round(float(d.get("graph_risk", 0.0)), 4),
+                "in_cycle": bool(d.get("in_cycle", False)),
+                "fan_in_flag": bool(d.get("fan_in_flag", False)),
+                "shared_device_flag": bool(d.get("shared_device_flag", False)),
+            }
+            for acc_id, d in sorted_accounts
+        ]
+    }

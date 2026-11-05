@@ -5,12 +5,14 @@ import LiveFeed from "./pages/LiveFeed.jsx";
 import GraphExplorer from "./pages/GraphExplorer.jsx";
 import CaseQueue from "./pages/CaseQueue.jsx";
 import Metrics from "./pages/Metrics.jsx";
+import RippleEffect from "./pages/RippleEffect.jsx";
 import {
   OverviewIcon,
   GraphIcon,
   CaseQueueIcon,
   MetricsIcon,
   AlertTriangleIcon,
+  RippleIcon,
 } from "./components/Icons.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 
@@ -19,6 +21,7 @@ const NAV = [
   { to: "/graph",   icon: GraphIcon,     label: "Graph Explorer" },
   { to: "/cases",   icon: CaseQueueIcon, label: "Case Queue"    },
   { to: "/metrics", icon: MetricsIcon,   label: "Metrics"        },
+  { to: "/ripple",  icon: RippleIcon,    label: "RippleEffect"  },
 ];
 
 export default function App() {
@@ -97,6 +100,7 @@ export default function App() {
             <Route path="/graph"   element={<GraphExplorer />} />
             <Route path="/cases"   element={<CaseQueue />}     />
             <Route path="/metrics" element={<Metrics />}       />
+            <Route path="/ripple"  element={<RippleEffect />}  />
           </Routes>
         </main>
       </div>

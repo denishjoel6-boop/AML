@@ -130,3 +130,30 @@ export function AlertTriangleIcon({ size = 14, className = '', ...props }) {
     </svg>
   )
 }
+
+/**
+ * Ripple / Wave Icon (RippleEffect Simulator)
+ * Concentric arcs radiating outward from a centre dot — represents scenario impact propagation
+ */
+export function RippleIcon({ size = 20, className = '', ...props }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <circle cx="12" cy="12" r="2" />
+      <path d="M6.3 6.3a8 8 0 0 0 0 11.4" />
+      <path d="M17.7 6.3a8 8 0 0 1 0 11.4" />
+      <path d="M3.5 3.5a14 14 0 0 0 0 17" />
+      <path d="M20.5 3.5a14 14 0 0 1 0 17" />
+    </svg>
+  )
+}
